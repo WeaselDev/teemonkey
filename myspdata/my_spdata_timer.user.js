@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         my_spdata_timer
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-11
-// @description  try to take over the world!
+// @version      2025-07-15
+// @description  How long do I have to stay
 // @author       weaseldev
 // @match        https://myspdata.duerkopp.com/
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=duerkopp.com
