@@ -48,7 +48,6 @@
         let hLeft = Math.floor(timeLeft);
         let mLeft = (60*(timeLeft-hLeft)).toFixed(0)
         mLeft = ("00000" + mLeft).slice(-2);
-        hLeft = hLeft * negateTime;
 
         var divEle = document.getElementById("timeLeft");
 
@@ -59,6 +58,6 @@
             divEle.classList.add("row");
             document.getElementById("timeterminalfront").querySelector(".col-8").appendChild(divEle);
         }
-        divEle.innerHTML = "Anwesend UPDATE bis " + endDate.toLocaleTimeString() + " (" + hLeft + ":" + mLeft + "h verbleibend)";
+        divEle.innerHTML = "Anwesend bis " + endDate.toLocaleTimeString() + " (" + hLeft + ":" + mLeft + "h " + (negateTime > 0 ? "verbleibend)" : "drüber)");
     }
 })();
