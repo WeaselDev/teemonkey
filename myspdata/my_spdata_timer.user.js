@@ -59,6 +59,6 @@
             divEle.classList.add("row");
             document.getElementById("timeterminalfront").querySelector(".col-8").appendChild(divEle);
         }
-        divEle.innerHTML = "Anwesend bis " + endDate.toLocaleTimeString() + " (" + hLeft + ":" + mLeft + "h verbleibend)";
+        divEle.innerHTML = "Anwesend UPDATE bis " + endDate.toLocaleTimeString() + " (" + hLeft + ":" + mLeft + "h verbleibend)";
     }
 })();
