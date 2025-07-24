@@ -5,6 +5,7 @@
 // @description  Zeigt verbleibende Arbeitszeit mit konfigurierbaren Pausen & Einstellungsdialog in my_spdata an.
 // @author       weaseldev
 // @match        https://myspdata.duerkopp.com/
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=duerkopp.com
 // @grant        none
 // ==/UserScript==
 
