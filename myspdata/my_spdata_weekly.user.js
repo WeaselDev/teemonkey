@@ -75,7 +75,7 @@
         const startWoche = [], stopWoche = [], startHeute = [], stopHeute = [];
 
         const rows = bookingTable.querySelectorAll("tr");
-        for (let i = rows.length - 1; i > 0; i--) {
+        for (let i = rows.length - 1; i >= 0; i--) {
             const cols = rows[i].children;
             const [d, m, y] = cols[0].innerText.split(".");
             const date = new Date(`${y}-${m}-${d}`);
@@ -85,10 +85,16 @@
             if (date >= weekStart) {
                 if (type === "Kommen") {
                     startWoche.push(time);
-                    if (date.getDate() === today.getDate()) startHeute.push(time);
+                    if (date.getDate() === today.getDate())
+                    {
+                        startHeute.push(time);
+                    }
                 } else if (type === "Gehen") {
                     stopWoche.push(time);
-                    if (date.getDate() === today.getDate()) stopHeute.push(time);
+                    if (date.getDate() === today.getDate())
+                    {
+                        stopHeute.push(time);
+                    }
                 }
             }
         }
@@ -101,13 +107,12 @@
 
         const pauseWoche = berechnePause(startWoche, stopWoche);
         const pauseHeute = berechnePause(startHeute, stopHeute);
-
         const arbeitWoche = stopWoche.reduce((a, b) => a + b, 0) - startWoche.reduce((a, b) => a + b, 0) - pauseWoche;
         const arbeitHeute = stopHeute.reduce((a, b) => a + b, 0) - startHeute.reduce((a, b) => a + b, 0) - pauseHeute;
+
         const restHeute = config.workingTime[dayIndex] - arbeitHeute;
 
         const startTimeToday = Math.min(...startHeute);
-        const endeIstPause = startTimeToday + config.workingTime[dayIndex] + pauseHeute;
         const endeVollPause = startTimeToday + config.workingTime[dayIndex] + vollPausenZeit();
 
         const weekTarget = config.workingTime.reduce((a, b) => a + b, 0);
@@ -115,30 +120,29 @@
 
         let display = document.getElementById("timeLeft");
         if (!display) {
-            display = document.createElement("div");
-            display.id = "timeLeft";
-            display.style = "font-size:16px; font-family:Tahoma; margin-top:-15px";
-            document.querySelector(".user-profile-text")?.append(display);
+            const newDisplay = document.createElement("div");
+            newDisplay.id = "timeLeft";
+            newDisplay.style = "font-size:16px; font-family:Tahoma; margin-top:-15px;background:#00000088;";
+            document.querySelector(".user-profile-text")?.append(newDisplay);
+            display = newDisplay;
         }
 
         display.style.color = restHeute > 0 ? "lightgreen" : "red";
+        display.title = "Zeigt verbleibende Arbeitszeit (mit aktueller oder voller Pause)";
         display.innerHTML = `
-            Heute ${restHeute > 0 ? "verbleibend" : "drüber"}: ${decTimeToString(Math.abs(restHeute))} bis: ${decTimeToString(endeIstPause)} Uhr (Ist-Pause) / ${decTimeToString(endeVollPause)} Uhr (volle Pause).
-            Woche: ${decTimeToString(arbeitWoche)} / ${decTimeToString(weekTarget)} h (${decTimeToString(restWoche)}h verbleibend)
+            Heute ${restHeute > 0 ? "verbleibend" : "drüber"}: <b>${decTimeToString(Math.abs(restHeute))}</b> bis: <b>${decTimeToString(endeVollPause)}</b> Uhr (inkl. Pausen). Woche: <b>${decTimeToString(arbeitWoche)}</b> / <b>${decTimeToString(weekTarget)}</b> h (${decTimeToString(restWoche)}h verbleibend)
         `;
     }
 
-    // === Config-Button ===
     function addSettingsButton() {
         const button = document.createElement("button");
         button.innerText = "⚙️";
-        button.title = "Konfiguration";
-        button.style = "position:absolute; top:5px; right:10px; font-size:18px; z-index:9999;";
+        button.title = "Konfiguration öffnen";
+        button.style = "position:fixed; bottom:15px; right:15px; font-size:18px; z-index:9999;";
         button.onclick = openSettingsDialog;
         document.body.appendChild(button);
     }
 
-    // === Konfigurationsdialog ===
     function openSettingsDialog() {
         const overlay = document.createElement("div");
         overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:#00000088;z-index:10000;display:flex;justify-content:center;align-items:center;";
@@ -148,17 +152,15 @@
 
         const html = `
             <h3>Konfiguration</h3>
-            <label>Tägliche Arbeitszeit (Mo-Fr):</label><br>
-            <input id="w1" value="${config.workingTime[0]}" size="4">
-            <input id="w2" value="${config.workingTime[1]}" size="4">
-            <input id="w3" value="${config.workingTime[2]}" size="4">
-            <input id="w4" value="${config.workingTime[3]}" size="4">
-            <input id="w5" value="${config.workingTime[4]}" size="4"><br><br>
+            <label>Tägliche Arbeitszeit (Mo–Fr):</label><br>
+            ${config.workingTime.map((w, i) =>
+                `<input id="w${i}" value="${w.toFixed(2)}" size="4">`
+            ).join(" ")}<br><br>
 
             <label>Pausen (Start - Ende):</label><br>
             ${config.breaks.map((b, i) => `
-                <input id="b${i}start" value="${b.start}" size="4"> -
-                <input id="b${i}end" value="${b.end}" size="4"><br>
+                <input id="b${i}start" value="${b.start.toFixed(2)}" size="4"> -
+                <input id="b${i}end" value="${b.end.toFixed(2)}" size="4"><br>
             `).join("")}
             <br>
             <button id="saveCfg">Speichern</button>
@@ -173,19 +175,19 @@
 
         document.getElementById("saveCfg").onclick = () => {
             const newCfg = {
-                workingTime: [
-                    parseFloat(document.getElementById("w1").value),
-                    parseFloat(document.getElementById("w2").value),
-                    parseFloat(document.getElementById("w3").value),
-                    parseFloat(document.getElementById("w4").value),
-                    parseFloat(document.getElementById("w5").value),
-                ],
+                workingTime: [],
                 breaks: []
             };
+            for (let i = 0; i < 5; i++) {
+                const val = parseFloat(document.getElementById(`w${i}`).value.replace(",", "."));
+                newCfg.workingTime.push(isNaN(val) ? defaultConfig.workingTime[i] : val);
+            }
             for (let i = 0; i < config.breaks.length; i++) {
+                const start = parseFloat(document.getElementById(`b${i}start`).value.replace(",", "."));
+                const end = parseFloat(document.getElementById(`b${i}end`).value.replace(",", "."));
                 newCfg.breaks.push({
-                    start: parseFloat(document.getElementById(`b${i}start`).value),
-                    end: parseFloat(document.getElementById(`b${i}end`).value)
+                    start: isNaN(start) ? config.breaks[i].start : start,
+                    end: isNaN(end) ? config.breaks[i].end : end
                 });
             }
             config = newCfg;
