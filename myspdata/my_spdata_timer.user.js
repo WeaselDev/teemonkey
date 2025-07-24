@@ -40,7 +40,7 @@
         let timeLeft = (endDate - new Date())/60/60/1000;
         let negateTime = false;
         if(timeLeft < 0){
-            timeLeft = timeLeft*-1;
+            timeLeft = -timeLeft;
             negateTime = true;
         }
         let hLeft = Math.floor(timeLeft);
