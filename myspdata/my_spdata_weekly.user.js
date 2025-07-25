@@ -85,16 +85,10 @@
             if (date >= weekStart) {
                 if (type === "Kommen") {
                     startWoche.push(time);
-                    if (date.getDate() === today.getDate())
-                    {
-                        startHeute.push(time);
-                    }
+                    if (date.getDate() === today.getDate()) startHeute.push(time);
                 } else if (type === "Gehen") {
                     stopWoche.push(time);
-                    if (date.getDate() === today.getDate())
-                    {
-                        stopHeute.push(time);
-                    }
+                    if (date.getDate() === today.getDate()) stopHeute.push(time);
                 }
             }
         }
@@ -109,7 +103,6 @@
         const pauseHeute = berechnePause(startHeute, stopHeute);
         const arbeitWoche = stopWoche.reduce((a, b) => a + b, 0) - startWoche.reduce((a, b) => a + b, 0) - pauseWoche;
         const arbeitHeute = stopHeute.reduce((a, b) => a + b, 0) - startHeute.reduce((a, b) => a + b, 0) - pauseHeute;
-
         const restHeute = config.workingTime[dayIndex] - arbeitHeute;
 
         const startTimeToday = Math.min(...startHeute);
@@ -127,11 +120,10 @@
             display = newDisplay;
         }
 
-        display.style.color = restHeute > 0 ? "lightgreen" : "red";
+        display.style.color = (restHeute > 0 && restWoche > 0) ? "lightgreen" : "#FFAB57";
         display.title = "Zeigt verbleibende Arbeitszeit (mit aktueller oder voller Pause)";
-        display.innerHTML = `
-            Heute ${restHeute > 0 ? "verbleibend" : "drüber"}: <b>${decTimeToString(Math.abs(restHeute))}</b> bis: <b>${decTimeToString(endeVollPause)}</b> Uhr (inkl. Pausen). Woche: <b>${decTimeToString(arbeitWoche)}</b> / <b>${decTimeToString(weekTarget)}</b> h (${decTimeToString(restWoche)}h verbleibend)
-        `;
+        //display.innerHTML = `Heute ${restHeute > 0 ? "verbleibend" : "drüber"}: <b>${decTimeToString(Math.abs(restHeute))}</b> bis: <b>${decTimeToString(endeVollPause)}</b> Uhr (inkl. Pausen). Woche: <b>${decTimeToString(arbeitWoche)}</b> / <b>${decTimeToString(weekTarget)}</b> h (${decTimeToString(restWoche)}h verbleibend)`;
+        display.innerHTML = `Heute(${decTimeToString(config.workingTime[dayIndex])}h): laufend ${decTimeToString(Math.abs(arbeitHeute))}h, ${restHeute > 0 ? "verbleibend" : "drüber"}: ${decTimeToString(Math.abs(restHeute))}h bis: ${decTimeToString(endeVollPause)} Uhr (inkl. Pausen). Woche(${decTimeToString(weekTarget)}h): laufend ${decTimeToString(arbeitWoche)}h, ${restWoche > 0 ? "verbleibend" : "drüber"}: ${decTimeToString(restWoche)}h`;
     }
 
     function addSettingsButton() {
