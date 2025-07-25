@@ -115,7 +115,7 @@
         if (!display) {
             const newDisplay = document.createElement("div");
             newDisplay.id = "timeLeft";
-            newDisplay.style = "font-size:16px; font-family:Tahoma; margin-top:-15px;background:#00000088;";
+            newDisplay.style = "font-size:16px; font-family:Tahoma; margin-top:-15px;background:rgba(0, 0, 0, 0.6);";
             document.querySelector(".user-profile-text")?.append(newDisplay);
             display = newDisplay;
         }
@@ -130,9 +130,10 @@
         const button = document.createElement("button");
         button.innerText = "⚙️";
         button.title = "Konfiguration öffnen";
-        button.style = "position:fixed; bottom:15px; right:15px; font-size:18px; z-index:9999;";
+        button.style = "font-size: 24.8px;border: none;background: #292929;font-weight: 400;";
         button.onclick = openSettingsDialog;
-        document.body.appendChild(button);
+        let navItem = document.querySelectorAll("ul.nav.float-right")[0];
+        navItem.appendChild(button);
     }
 
     function openSettingsDialog() {
