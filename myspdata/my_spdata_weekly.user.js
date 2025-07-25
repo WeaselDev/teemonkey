@@ -44,6 +44,9 @@
     }
 
     function decTimeToString(decTime) {
+        if(decTime < 0){
+            decTime = -decTime;
+        }
         const h = Math.floor(decTime);
         const m = ("00" + Math.round((decTime - h) * 60)).slice(-2);
         return `${h}:${m}`;
