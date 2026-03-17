@@ -1,7 +1,8 @@
+// JavaScript source code
 // ==UserScript==
 // @name         my_spdata_configurable
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-24
+// @version      2026-03-17
 // @description  Zeigt verbleibende Arbeitszeit mit konfigurierbaren Pausen & Einstellungsdialog in my_spdata an.
 // @author       weaseldev
 // @match        https://myspdata.duerkopp.com/
@@ -26,7 +27,7 @@
             if (stored?.workingTime?.length === 5 && Array.isArray(stored.breaks)) {
                 return stored;
             }
-        } catch (e) {}
+        } catch (e) { }
         return defaultConfig;
     }
 
@@ -36,20 +37,35 @@
 
     let config = loadConfig();
 
+    const DEBUG = false;
+
     const vollPausenZeit = () => config.breaks.reduce((sum, p) => sum + (p.end - p.start), 0);
 
     function timeStrToNum(str) {
-        const [h, m] = str.split(":");
-        return parseFloat(h) + (parseFloat(m) || 0) / 60;
+        if (str == null) return NaN;
+        const s = String(str).trim().replace(",", ".");
+        if (s === "") return NaN;
+        // format HH:MM
+        if (s.includes(":")) {
+            const parts = s.split(":");
+            const h = parseFloat(parts[0].replace(/[^0-9\-\.\+]/g, ""));
+            const m = parts[1] ? parseFloat(parts[1].replace(/[^0-9\-\.\+]/g, "")) : 0;
+            if (isNaN(h)) return NaN;
+            return h + (isNaN(m) ? 0 : m / 60);
+        }
+        // decimal hours like "7.5" or "7,5"
+        const v = parseFloat(s.replace(/[^0-9\-\.\+]/g, ""));
+        return isNaN(v) ? NaN : v;
     }
 
     function decTimeToString(decTime) {
-        if(decTime < 0){
-            decTime = -decTime;
-        }
-        const h = Math.floor(decTime);
-        const m = ("00" + Math.round((decTime - h) * 60)).slice(-2);
-        return `${h}:${m}`;
+        const negative = decTime < 0;
+        if (negative) decTime = -decTime;
+        let h = Math.floor(decTime);
+        let m = Math.round((decTime - h) * 60);
+        if (m === 60) { h += 1; m = 0; }
+        const ms = ("00" + m).slice(-2);
+        return `${negative ? '-' : ''}${h}:${ms}`;
     }
 
     function berechnePause(starts, stops) {
@@ -66,7 +82,8 @@
     }
 
     function soLangeNoch() {
-        const bookingTable = document.querySelector("#bookings tbody");
+        console.log("ping")
+        const bookingTable = document.querySelector(".ag-body");
         if (!bookingTable) return;
 
         const today = new Date();
@@ -77,22 +94,34 @@
 
         const startWoche = [], stopWoche = [], startHeute = [], stopHeute = [];
 
-        const rows = bookingTable.querySelectorAll("tr");
+        const rows = bookingTable.querySelectorAll(".ag-row");
         for (let i = rows.length - 1; i >= 0; i--) {
-            const cols = rows[i].children;
-            const [d, m, y] = cols[0].innerText.split(".");
-            const date = new Date(`${y}-${m}-${d}`);
-            const type = cols[1].innerText.trim();
-            const time = timeStrToNum(cols[2].innerText);
+            try {
+                const cols = rows[i].children;
+                if (!cols || cols.length < 3) continue;
+                const dateText = cols[0].innerText.trim();
+                const dateParts = dateText.split(".");
+                if (dateParts.length !== 3) continue;
+                const [d, m, y] = dateParts;
+                const date = new Date(`${y}-${m}-${d}`);
+                if (isNaN(date.getTime())) continue;
+                const type = cols[1].innerText.trim();
+                if (type !== "Kommen" && type !== "Gehen") continue;
+                const time = timeStrToNum(cols[2].innerText);
+                if (!isFinite(time) || time < 0 || time >= 24) continue;
 
-            if (date >= weekStart) {
-                if (type === "Kommen") {
-                    startWoche.push(time);
-                    if (date.getDate() === today.getDate()) startHeute.push(time);
-                } else if (type === "Gehen") {
-                    stopWoche.push(time);
-                    if (date.getDate() === today.getDate()) stopHeute.push(time);
+                if (date >= weekStart) {
+                    if (type === "Kommen") {
+                        startWoche.push(time);
+                        if (date.getDate() === today.getDate()) startHeute.push(time);
+                    } else if (type === "Gehen") {
+                        stopWoche.push(time);
+                        if (date.getDate() === today.getDate()) stopHeute.push(time);
+                    }
                 }
+            } catch (err) {
+                // ignore malformed row and continue parsing the rest
+                continue;
             }
         }
 
@@ -108,35 +137,112 @@
         const arbeitHeute = stopHeute.reduce((a, b) => a + b, 0) - startHeute.reduce((a, b) => a + b, 0) - pauseHeute;
         const restHeute = config.workingTime[dayIndex] - arbeitHeute;
 
-        const startTimeToday = Math.min(...startHeute);
+        const startTimeToday = startHeute.length ? Math.min(...startHeute) : nowTime;
         const endeVollPause = startTimeToday + config.workingTime[dayIndex] + vollPausenZeit();
 
         const weekTarget = config.workingTime.reduce((a, b) => a + b, 0);
         const restWoche = weekTarget - arbeitWoche;
 
+        // ensure table is present as its own li before the config button
         let display = document.getElementById("timeLeft");
         if (!display) {
-            const newDisplay = document.createElement("div");
-            newDisplay.id = "timeLeft";
-            newDisplay.style = "font-size:16px; font-family:Tahoma; margin-top:-15px;background:rgba(0, 0, 0, 0.6);";
-            document.querySelector(".user-profile-text")?.append(newDisplay);
-            display = newDisplay;
+            const table = document.createElement("table");
+            table.id = "timeLeft";
+            table.style = "font-size:14px; font-family:Tahoma; margin-top:-6px; background:transparent; color:inherit; border-collapse:collapse;";
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th style="padding:4px 8px;text-align:left;color:inherit;background:transparent;border:none"></th>
+                        <th style="padding:4px 8px;text-align:left;color:inherit;background:transparent;border:none">Laufend</th>
+                        <th style="padding:4px 8px;text-align:left;color:inherit;background:transparent;border:none">Verbleibend</th>
+                        <th style="padding:4px 8px;text-align:left;color:inherit;background:transparent;border:none">Feierabend</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:4px 8px">Heute</td>
+                        <td id="tl_today_running" style="padding:4px 8px"></td>
+                        <td id="tl_today_remaining" style="padding:4px 8px"></td>
+                        <td id="tl_today_end" style="padding:4px 8px"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 8px">Woche</td>
+                        <td id="tl_week_running" style="padding:4px 8px"></td>
+                        <td id="tl_week_remaining" style="padding:4px 8px"></td>
+                        <td id="tl_week_end" style="padding:4px 8px"></td>
+                    </tr>
+                </tbody>
+            `;
+
+            const navList = document.querySelector('#navbar-mobile ul.nav.navbar-nav.float-right') || document.querySelector('ul.nav.navbar-nav.float-right') || document.querySelector('ul.nav.float-right') || document.querySelector('#navbar-mobile > ul');
+            if (navList) {
+                const tableLi = document.createElement('li');
+                tableLi.className = 'nav-item';
+                tableLi.style = 'display:flex;align-items:center;margin-right:8px;';
+                tableLi.appendChild(table);
+                // insert before config button if present, otherwise before wrench
+                const cfgLi = navList.querySelector('#mysp_cfg_li');
+                const wrenchLi = navList.querySelector('li.dashboardIcon');
+                if (cfgLi) navList.insertBefore(tableLi, cfgLi);
+                else if (wrenchLi) navList.insertBefore(tableLi, wrenchLi);
+                else navList.appendChild(tableLi);
+            } else {
+                // fallback: attach to body fixed near top-right
+                const fallback = document.createElement('div');
+                fallback.style = 'position:fixed;top:8px;right:64px;z-index:9999;background:rgba(0,0,0,0.6);padding:4px;border-radius:4px;';
+                fallback.appendChild(table);
+                document.body.appendChild(fallback);
+            }
+
+            display = table;
         }
 
         display.style.color = (restHeute > 0 && restWoche > 0) ? "lightgreen" : "#FFAB57";
         display.title = "Zeigt verbleibende Arbeitszeit (mit aktueller oder voller Pause)";
-        //display.innerHTML = `Heute ${restHeute > 0 ? "verbleibend" : "drüber"}: <b>${decTimeToString(Math.abs(restHeute))}</b> bis: <b>${decTimeToString(endeVollPause)}</b> Uhr (inkl. Pausen). Woche: <b>${decTimeToString(arbeitWoche)}</b> / <b>${decTimeToString(weekTarget)}</b> h (${decTimeToString(restWoche)}h verbleibend)`;
-        display.innerHTML = `Heute(${decTimeToString(config.workingTime[dayIndex])}h): laufend ${decTimeToString(Math.abs(arbeitHeute))}h, ${restHeute > 0 ? "verbleibend" : "drüber"}: ${decTimeToString(Math.abs(restHeute))}h bis: ${decTimeToString(endeVollPause)} Uhr (inkl. Pausen). Woche(${decTimeToString(weekTarget)}h): laufend ${decTimeToString(arbeitWoche)}h, ${restWoche > 0 ? "verbleibend" : "drüber"}: ${decTimeToString(restWoche)}h`;
+
+        const setCell = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = value;
+        };
+
+        setCell('tl_today_running', `${decTimeToString(Math.abs(arbeitHeute))} h`);
+        setCell('tl_today_remaining', `${decTimeToString(Math.abs(restHeute))} h`);
+        setCell('tl_today_end', `${decTimeToString(endeVollPause)} Uhr`);
+
+        setCell('tl_week_running', `${decTimeToString(arbeitWoche)} h`);
+        setCell('tl_week_remaining', `${decTimeToString(restWoche)} h`);
+        setCell('tl_week_end', '');
     }
 
     function addSettingsButton() {
+        // avoid adding the button twice
+        if (document.getElementById('mysp_cfg_btn')) return;
+
         const button = document.createElement("button");
+        button.id = 'mysp_cfg_btn';
         button.innerText = "⚙️";
         button.title = "Konfiguration öffnen";
-        button.style = "font-size: 24.8px;border: none;background: #292929;font-weight: 400;";
+        button.style = "font-size: 20px; border: none; background: transparent; color: inherit; cursor: pointer;";
+        button.setAttribute('aria-label', 'Konfiguration öffnen');
         button.onclick = openSettingsDialog;
-        let navItem = document.querySelectorAll("ul.nav.float-right")[0];
-        navItem.appendChild(button);
+        // try to place into the header navbar right-side list
+        let navList = document.querySelector('#navbar-mobile ul.nav.navbar-nav.float-right') || document.querySelector('ul.nav.navbar-nav.float-right') || document.querySelector('ul.nav.float-right') || document.querySelector('#navbar-mobile > ul');
+        if (navList) {
+            const li = document.createElement('li');
+            li.id = 'mysp_cfg_li';
+            li.className = 'nav-item';
+            li.style = 'display:flex;align-items:center;';
+            li.appendChild(button);
+            const wrenchLi = navList.querySelector('li.dashboardIcon');
+            if (wrenchLi) navList.insertBefore(li, wrenchLi);
+            else navList.appendChild(li);
+            return;
+        }
+        // fallback: fixed container in top-right
+        const fallback = document.createElement("div");
+        fallback.style = "position:fixed;top:8px;right:8px;z-index:9999;";
+        fallback.appendChild(button);
+        document.body.appendChild(fallback);
     }
 
     function openSettingsDialog() {
@@ -150,8 +256,8 @@
             <h3>Konfiguration</h3>
             <label>Tägliche Arbeitszeit (Mo–Fr):</label><br>
             ${config.workingTime.map((w, i) =>
-                `<input id="w${i}" value="${w.toFixed(2)}" size="4">`
-            ).join(" ")}<br><br>
+            `<input id="w${i}" value="${w.toFixed(2)}" size="4">`
+        ).join(" ")}<br><br>
 
             <label>Pausen (Start - Ende):</label><br>
             ${config.breaks.map((b, i) => `
@@ -194,12 +300,28 @@
     }
 
     // === Initialisierung ===
-    const initInterval = setInterval(() => {
-        if (document.querySelector("#bookings tbody")) {
-            clearInterval(initInterval);
+    function initializeWhenReady() {
+        if (document.querySelector('.ag-body')) {
             soLangeNoch();
-            setInterval(soLangeNoch, 20000);
+            window.setInterval(soLangeNoch, 20000);
             addSettingsButton();
+            return true;
         }
-    }, 1000);
+        return false;
+    }
+
+    // quick path: if already present
+    if (!initializeWhenReady()) {
+        const observer = new MutationObserver((mutations, obs) => {
+            if (document.querySelector('.ag-body')) {
+                obs.disconnect();
+                soLangeNoch();
+                window.setInterval(soLangeNoch, 20000);
+                addSettingsButton();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
 })();
+
+
